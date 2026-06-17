@@ -17,13 +17,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 
-from easy_plot.types import SPINE, SPINES
-
-
-@dataclass
-class LabelCfg():
-    label: str
-    fontsize: int = 12
+from easy_plot.types import SPINE, SPINES, LabelCfg
 
 
 class Figure():
