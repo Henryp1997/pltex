@@ -6,7 +6,9 @@ Matplotlib wrapper for easier and cleaner plot scripting
     - Author: Henry Pickersgill (2026)
 """
 
+from pathlib import Path
 from dataclasses import dataclass
+import pickle
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -81,6 +83,8 @@ class Figure():
         ylabel: str | dict | LabelCfg = "Y",
         row_idx: int = 0,
         col_idx: int = 0,
+        xticklabel_fontsize: int | None = None,
+        yticklabel_fontsize: int | None = None,
         **kwargs
     ):
         """ Add data to the axes """
@@ -118,6 +122,11 @@ class Figure():
 
         ax.set_xlabel(axis_labels["x"]["label"], fontsize=axis_labels["x"]["fontsize"])
         ax.set_ylabel(axis_labels["y"]["label"], fontsize=axis_labels["y"]["fontsize"])
+
+        if xticklabel_fontsize is not None:
+            ax.tick_params(axis="x", which="major", labelsize=xticklabel_fontsize)
+        if yticklabel_fontsize is not None:
+            ax.tick_params(axis="y", which="major", labelsize=yticklabel_fontsize)
 
         if self.legend_on:
             ax.legend(fontsize=self.legend_fontsize)
@@ -268,6 +277,14 @@ class Figure():
         # any given plot will be permanently closed unless explicitly opened again.
         # However, if no figs called .show(), all figs will be shown
         plt.show()
+
+
+    def save_as_pickle(self, filename: str | Path = "figure"):
+        """ Save the Figure's fig attribute as a pickle file """
+        if not filename.endswith(".pkl"):
+            filename += ".pkl"
+        with open(filename, "wb") as f:
+            pickle.dump(self.fig, f)
 
 
     ### PRIVATE METHODS
