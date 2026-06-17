@@ -8,6 +8,7 @@ Matplotlib wrapper for easier and cleaner plot scripting
 
 from pathlib import Path
 from dataclasses import dataclass
+from typing import get_args
 import pickle
 
 import matplotlib.pyplot as plt
@@ -15,6 +16,8 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 import scipy as sp
+
+from easy_plot.types import SPINE, SPINES
 
 
 @dataclass
@@ -236,15 +239,17 @@ class Figure():
         """ Draw a horizontal or vertical line spanning the full width/height of the axes """
 
 
-    def set_axes_spine_colour(
+    def set_axis_spine_colour(
         self,
         colour: str,
         all: bool = True,
-        spines: list[str] | tuple[str] | set[str] | None = None,
+        spines: SPINES | None = None,
+        row_idx: int = 0,
         col_idx: int = 0
     ):
-        """ TODO: fix for row AND col index """
-        all_spines = {"top", "bottom", "left", "right"}
+        """ Set the colour of one or more spines of the figure """
+        ax = self._getAx(row_idx, col_idx)
+        all_spines = set(get_args(SPINE)) # Get a set of all valid spine names
         if all:
             spines = all_spines
         else:
@@ -255,7 +260,7 @@ class Figure():
                     raise ValueError(f"Unrecognised spine! Spines must be any set of {all_spines}")
 
         for spine in spines:
-            self.axes[col_idx].spines[spine].set_color(colour)
+            ax.spines[spine].set_color(colour)
 
 
     def remove_legend(self, row_idx: int = 0, col_idx: int = 0):
