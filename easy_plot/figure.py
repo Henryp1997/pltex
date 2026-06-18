@@ -114,7 +114,7 @@ class Figure():
                 )
             elif isinstance(lab_obj, str):
                 lab_obj = LabelCfg(lab_obj, self.default_fontsize)
-            elif isinstance(lab_obj, None):
+            elif lab_obj is None:
                 axis_labels[name] = None
             else:
                 raise TypeError(
