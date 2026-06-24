@@ -1,2 +1,2 @@
 # easy_plot
-Matplotlib wrapper for easier plot creation and control
+`easy_plot` (https://github.com/Henryp1997/easy_plot) is a tool to aid programmers in creating Matplotlib figures quicker and easier. It is intended to remove a lot of the boilerplate involved in creating plots using Matplotlib. It also includes additional features, such as the ability to save .eplot files, which are serialised `Figure` objects, with the intention of being able to view these as _interactive figures_.
