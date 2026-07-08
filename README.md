@@ -17,4 +17,4 @@ fig.plot(
 fig.show() # Mark figure as visible
 Figure.display() # Display all figures marked as visible
 ```
-<img width="682" height="455" alt="image" src="https://github.com/user-attachments/assets/a70d99ae-62f5-4168-a7c5-d436b8b1bb44" />
+<img width="768" height="480" alt="test" src="https://github.com/user-attachments/assets/a008a987-28b5-4e34-804e-f0a668bbf0e8" />
