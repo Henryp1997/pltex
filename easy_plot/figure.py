@@ -125,7 +125,11 @@ class Figure():
             point, = ax.plot(x, y, fmt, **kwargs)
 
             if arrows:
-                self._draw_arrows(ax, x, y, color=fmt_color)
+                color = fmt_color
+                if not fmt_color:
+                    # No color present in fmt string
+                    color = point.get_color()
+                self._draw_arrows(ax, x, y, color=color)
 
             # Connect click event to daughter Figure
             if self.daughter is not None:
