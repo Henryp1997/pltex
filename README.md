@@ -20,7 +20,7 @@ Figure.display() # Display all figures marked as visible
 <img width="768" height="480" alt="test" src="examples/example1.svg" />
 
 ## Arrow (`->`) marker format
-Included in pltex is a custom marker format: `->`. Similar to native matplotlib where fmt=`-` draws lines between points, setting fmt=`->` will draw arrows between points. This is especially useful when the direction of data matters (e.g., indicating increasing direction of an independent variable).
+Included in pltex is a custom marker format: `->`. Similar to native matplotlib where `fmt="-"` draws lines between points, setting `fmt="->"` will draw arrows between points. This is especially useful when the direction of data matters (e.g., indicating increasing direction of an independent variable).
 ```
 fig.plot(
     x, x**2, "bo->",
