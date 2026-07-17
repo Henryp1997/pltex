@@ -6,10 +6,7 @@ Matplotlib wrapper for easier and cleaner plot scripting
     - Author: Henry Pickersgill (2026)
 """
 
-import re
-from pathlib import Path
 from typing import get_args
-import pickle
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -19,6 +16,8 @@ import scipy as sp
 
 from pltex.types import SPINE, SPINES, LabelCfg
 from pltex.label_handler import extract_axis_labels
+from pltex.str_format import unpack_plot_args, parse_arrow_fmt
+from pltex.saving import save_figure
 
 
 class Figure():
@@ -39,7 +38,11 @@ class Figure():
         default_legend_fsize: int = 10,
         default_legend_alpha: float = 1.0
     ):
-        self.fig, self.axes = plt.subplots(figsize=figsize, nrows=nrows, ncols=ncols)
+        self.fig, self.axes = plt.subplots(
+            nrows=nrows, ncols=ncols,
+            figsize=figsize,
+            squeeze=False
+        )
         self.nrows, self.ncols = nrows, ncols
         self.multi_plot: bool = nrows > 1 or ncols > 1
         self.np, self.pd, self.sp, self.plt = self.plt = np, pd, sp, plt
@@ -48,18 +51,11 @@ class Figure():
         if self.multi_plot:
             self.fig.suptitle(self.title, y=0.95)
         else:
-            self.axes.set_title(self.title)
-
-        # Grid and legend config
-        axes = self.axes
-        if not self.multi_plot:
-            axes = [self.axes]
+            self.axes[0, 0].set_title(self.title)
 
         if grid_on:
-            if nrows > 1 or ncols > 1:
-                # Flatten 2D array for loop
-                axes = axes.flatten()
-            for ax in axes:
+            for ax in self.axes:
+                ax = ax[0]
                 if grid_on:
                     ax.grid(ls=grid_ls, lw=grid_lw)
 
@@ -99,13 +95,13 @@ class Figure():
         **kwargs
     ):
         """ Add data to the axes """
-        ax = self._getAx(row_idx, col_idx)
+        ax = self.axes[row_idx, col_idx]
 
-        x, y, fmt = self._unpack_plot_args(args)
+        x, y, fmt = unpack_plot_args(args, default_fmt=self.default_fmt)
         arrows = False
         if "->" in fmt[1:]:
             # Custom arrow format found
-            fmt_color, fmt = self._parse_arrow_fmt(fmt)
+            fmt_color, fmt = parse_arrow_fmt(fmt)
             arrows = True
 
         # Only create connected daughter Figure for plots of singular points
@@ -173,7 +169,7 @@ class Figure():
 
     def bar(self, *args, colour: str | tuple | list | None = None, **kwargs):
         """ Create a bar chart. Interface to self.plot """
-        x, y, fmt = self._unpack_plot_args(args)
+        x, y, fmt = unpack_plot_args(args, default_fmt=self.default_fmt)
 
         if colour is None:
             if not kwargs.get("color"):
@@ -206,7 +202,7 @@ class Figure():
         self,
         y,
         xmin: int = 0,
-        xmax: int = 0,
+        xmax: int = 1,
         row_idx: int = 0,
         col_idx: int = 0,
         colour: str = "k",
@@ -215,7 +211,7 @@ class Figure():
         **kwargs
     ):
         """ Draw a horizontal line spanning a given range. Defaults to full range """
-        ax = self._getAx(row_idx, col_idx)
+        ax = self.axes[row_idx, col_idx]
         kwargs["color"] = colour
         kwargs["linestyle"] = linestyle
         kwargs["linewidth"] = linewidth
@@ -226,7 +222,7 @@ class Figure():
         self,
         x,
         ymin: int = 0,
-        ymax: int = 0,
+        ymax: int = 1,
         row_idx: int = 0,
         col_idx: int = 0,
         colour: str = "k",
@@ -235,7 +231,7 @@ class Figure():
         **kwargs
     ):
         """ Draw a vertical line spanning a given range. Defaults to full range """
-        ax = self._getAx(row_idx, col_idx)
+        ax = self.axes[row_idx, col_idx]
         kwargs["color"] = colour
         kwargs["linestyle"] = linestyle
         kwargs["linewidth"] = linewidth
@@ -253,61 +249,19 @@ class Figure():
 
 
     ### Text handling
-    def add_text(
-        self,
-        pos,
-        text,
-        row_idx: int = 0,
-        col_idx: int = 0,
-        box: bool = False,
-        box_border_colour: str = None,
-        box_face_colour: str = None,
-        box_alpha: float = None,
-        fontsize: int = 12,
-        **kwargs
-    ) -> None:
-        """ Add text to a given axes object """
-        ax = self._getAx(row_idx, col_idx)
-
-        bbox = kwargs.get("bbox")
-        if bbox is None:
-            bbox = None
-            if box or any(val is not None for val in (box_border_colour, box_face_colour, box_alpha)):
-                if box_border_colour is None:
-                    box_border_colour = "black"
-                if box_face_colour is None:
-                    box_face_colour = "white"
-                if box_alpha is None:
-                    box_alpha = 1.0
-                bbox = {
-                    "edgecolor": box_border_colour,
-                    "facecolor": box_face_colour,
-                    "alpha"    : box_alpha
-                }
-        else:
-            # Passing in bbox directly overrides custom parameters
-            kwargs.pop("bbox")
-
-        x, y = pos
-        xmin, xmax = ax.get_xlim()
-        ymin, ymax = ax.get_ylim()
-        if not xmin <= x <= xmax:
-            xmid = 0.5 * (xmin + xmax)
-            x = xmid
-            print(f"add_text --> text X coordinate out of axis range! Setting x to {xmid:.1f}")
-        if not ymin <= y <= ymax:
-            ymid = 0.5 * (ymin + ymax)
-            y = ymid
-            print(f"add_text --> text Y coordinate out of axis range! Setting y to {ymid:.1f}")
-
-        # High zorder to force matplotlib to paint textbox on top of grid lines and data
-        ax.text(x, y, text, fontsize=fontsize, bbox=bbox, zorder=99999, **kwargs)
+    def add_text(self, *args, **kwargs):
+        """ Add text to a given axes object. Interface to text_handler.add_text() """
+        if "row_idx" not in kwargs:
+            row_idx = 0
+        if "col_idx" not in kwargs:
+            col_idx = 0
+        ax = self.axes[row_idx, col_idx]
+        return self.text_handler.add_text(ax, *args, **kwargs)
 
 
     def add_textbox(self, *args, **kwargs):
         """ Interface to add_text to also force drawing of bounding box """
-        kwargs["box"] = True
-        self.add_text(*args, **kwargs)
+        self.text_handler.add_textbox(*args, **kwargs)
 
 
     ### Legend handling
@@ -326,7 +280,7 @@ class Figure():
             axes = [self.axes] if not self.multi_plot else self.axes
         else:
             # Create a legend on specified axis only
-            ax = self._getAx(row_idx, col_idx)
+            ax = self.axes[row_idx, col_idx]
             axes = [ax] # Iterable for below loop
 
         self.legends = []
@@ -361,7 +315,7 @@ class Figure():
         self.plot(
             np.nan, fmt, label=label, row_idx=row_idx, col_idx=col_idx
         )
-        ax = self._getAx(row_idx, col_idx)
+        ax = self.axes[row_idx, col_idx]
         if ax.get_legend() is None:
             print(
                 "pltex warning: specified axis has no legend. Set `legend_on=True` "\
@@ -372,29 +326,29 @@ class Figure():
     def remove_legend(self, row_idx: int = 0, col_idx: int = 0):
         """ Remove the legend from a specified axis """
         if self.legends:
-            ax = self._getAx(row_idx, col_idx)
+            ax = self.axes[row_idx, col_idx]
             ax.get_legend().remove()
 
 
     def set_axis_spine_colour(
         self,
         colour: str,
-        all: bool = True,
+        all_spines: bool = True,
         spines: SPINES | None = None,
         row_idx: int = 0,
         col_idx: int = 0
     ):
         """ Set the colour of one or more spines of the figure """
-        ax = self._getAx(row_idx, col_idx)
-        all_spines = set(get_args(SPINE)) # Get a set of all valid spine names
-        if all:
-            spines = all_spines
+        ax = self.axes[row_idx, col_idx]
+        ALL_SPINES = set(get_args(SPINE)) # Get a set of all valid spine names
+        if all_spines:
+            spines = ALL_SPINES
         else:
             if spines is None:
-                spines = all_spines
+                spines = ALL_SPINES
             else:
-                if any(spine not in all_spines for spine in spines):
-                    raise ValueError(f"Unrecognised spine! Spines must be any set of {all_spines}")
+                if any(spine not in ALL_SPINES for spine in spines):
+                    raise ValueError(f"Unrecognised spine! Spines must be any set of {ALL_SPINES}")
 
         for spine in spines:
             ax.spines[spine].set_color(colour)
@@ -407,7 +361,7 @@ class Figure():
         col_idx: int = 0,
         fontsize: int | None = None
     ):
-        """ Interface to self._set_label """
+        """ Interface to self._set_label to set the X axis label """
         self._set_label("x", xlabel, row_idx, col_idx, fontsize)
 
 
@@ -418,7 +372,7 @@ class Figure():
         col_idx: int = 0,
         fontsize: int | None = None
     ):
-        """ Interface to self._set_label """
+        """ Interface to self._set_label to set the Y axis label """
         self._set_label("y", ylabel, row_idx, col_idx, fontsize)
 
 
@@ -431,7 +385,7 @@ class Figure():
         fontsize: int | None = None
     ):
         """ Interface to ax.set_xlabel or ax.set_ylabel """
-        ax = self._getAx(row_idx, col_idx)
+        ax = self.axes[row_idx, col_idx]
         if axis == "x":
             self.xlabel = label
         else:
@@ -476,78 +430,12 @@ class Figure():
         plt.show()
 
 
-    def save_interactive(self, filename: str | Path = "figure"):
-        """
-        Save this Figure's fig attribute as interactive file
-
-        TODO: this currently relies on pickle. Must transition to
-        custom format for maximum compatibility
-        """
-        if not filename.endswith(".pltex"):
-            filename += ".pltex"
-        with open(filename, "wb") as f:
-            pickle.dump(self.fig, f)
+    def save_interactive(self, filename: str = "figure"):
+        """ Save the current Figure as an interactive .pltex file """
+        return save_figure(self.fig, filename)
 
 
     ### PRIVATE METHODS
-    def _unpack_plot_args(self, args):
-        """ Unpack the first args in the .plot() call into x, y and fmt (marker format) """
-        if len(args) == 3:
-            # Plot X and Y data with given format string
-            x, y, fmt = args
-        elif len(args) == 2:
-            if isinstance(args[-1], str):
-                # Plot Y data with X = index
-                y, fmt = args
-                if not isinstance(y, (list, tuple, np.ndarray)):
-                    y = [y]
-                x = np.arange(0, len(y), 1)
-            else:
-                x, y = args
-                fmt = self.default_fmt
-        elif len(args) == 1:
-            if isinstance(args[0], str):
-                # Plot single point (no data specified)
-                x, y = 0, 0
-            else:
-                # Plot y data with X = index and default format
-                y = args[0]
-                if isinstance(y, (list, tuple, np.ndarray)):
-                    x = np.arange(0, len(y) + 1, 1)
-                else:
-                    # Single y value plotted
-                    x = y
-            fmt = self.default_fmt
-
-        return x, y, fmt
-
-
-    def _parse_arrow_fmt(self, fmt) -> str:
-        """
-        Parse a format (`fmt`) string containing the custom '->' format type
-        into a string understood by matplotlib plotting methods
-        """
-        base_colors = list(mpl.colors.BASE_COLORS.keys())
-        match = re.search(rf"[{''.join(base_colors)}]", fmt)
-        color = ""
-        if match is not None:
-            color = match.group(0)
-        base_markers = [
-            m for m in mpl.markers.MarkerStyle.markers.keys()
-            if m not in ("None", "none", " ", "")
-        ]
-        match = re.search(
-            rf"[{''.join([str(i) for i in base_markers])}]",
-            fmt
-        )
-        marker = "x"
-        if match is not None:
-            marker = match.group(0)
-        
-        fmt = f"{color}{marker}" # Remove '-' from fmt
-        return color, fmt
-
-
     def _draw_arrows(self, ax, x, y, color) -> None:
         """ Draw arrows connecting points if '->' marker fmt was specified """
         for k in range(0, len(x) - 1):
@@ -561,21 +449,6 @@ class Figure():
                     lw=1,
                 ),
             )
-
-
-    def _getAx(self, row_idx: int, col_idx: int) -> mpl.axes.Axes:
-        """ Get a single Axes object given row and column indices """
-        if self.multi_plot:
-            if self.nrows == 1:
-                ax = self.axes[col_idx]
-            elif self.ncols == 1:
-                ax = self.axes[row_idx]
-            else:
-                ax = self.axes[row_idx][col_idx]
-        else:
-            ax = self.axes
-
-        return ax
 
 
     ### Daughter plot handling
